@@ -1,0 +1,86 @@
+[GEN 01] best=0.9772 avg=0.9294 hls=(61, 41) act=tanh alpha=1.25e-05 lr=9.83e-02 seed=8348
+[GEN 02] best=0.9789 avg=0.9671 hls=(61, 41) act=relu alpha=1.25e-05 lr=9.83e-02 seed=8348
+[GEN 03] best=0.9825 avg=0.9683 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 04] best=0.9825 avg=0.9704 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 05] best=0.9825 avg=0.9710 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 06] best=0.9825 avg=0.9694 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 07] best=0.9825 avg=0.9708 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 08] best=0.9825 avg=0.9706 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 09] best=0.9825 avg=0.9697 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 10] best=0.9825 avg=0.9715 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+
+=== BEST CONFIGURATION (10-fold CV) ===
+hidden_layer_sizes: (61, 41)
+activation        : tanh
+alpha (L2)        : 2.663e-05
+learning_rate_init: 7.069e-02
+seed              : 8348
+mean_accuracy     : 0.9825
+[INFO] Saved trained pipeline to ga_results\final_model.joblib
+[INFO] GA history written to ga_results\history.jsonl
+[DONE]
+
+-------------------------------------------------------------------------------------------
+
+Legend for per-generation output:
+  GEN          = Generation index in the genetic algorithm
+  best         = Best mean accuracy from 10-fold (≈10%) cross validation in this generation
+  avg          = Average of mean accuracies over all individuals in this generation
+  hls          = Hidden layer sizes (tuple of nodes per hidden layer)
+  act          = Activation function used by the MLP ('relu', 'tanh', or 'logistic')
+  alpha        = L2 regularization strength (higher = stronger weight decay)
+  lr           = Initial learning rate for Adam optimizer
+  seed         = Random seed used by the model (controls reproducibility)
+
+[GEN 01] best=0.9772 avg=0.9294 hls=(61, 41) act=tanh alpha=1.25e-05 lr=9.83e-02 seed=8348
+[GEN 02] best=0.9789 avg=0.9671 hls=(61, 41) act=relu alpha=1.25e-05 lr=9.83e-02 seed=8348
+[GEN 03] best=0.9825 avg=0.9683 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 04] best=0.9825 avg=0.9704 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 05] best=0.9825 avg=0.9710 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 06] best=0.9825 avg=0.9694 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 07] best=0.9825 avg=0.9708 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 08] best=0.9825 avg=0.9706 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 09] best=0.9825 avg=0.9697 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+[GEN 10] best=0.9825 avg=0.9715 hls=(61, 41) act=tanh alpha=2.66e-05 lr=7.07e-02 seed=8348
+
+=== BEST CONFIGURATION (10-fold CV) ===
+hidden_layer_sizes: (61, 41)
+activation        : tanh
+alpha (L2)        : 2.663e-05
+learning_rate_init: 7.069e-02
+seed              : 8348
+mean_accuracy     : 0.9825
+[DONE]
+
+-------------------------------------------------------------------------------------------
+
+
+Legend for per-generation output:
+  GEN   = Generation index
+  best  = Best mean accuracy from 10-fold cross validation
+  avg   = Average mean accuracy of all individuals in the generation
+  hls   = Hidden layer sizes (tuple of nodes per hidden layer)
+  act   = Activation function (relu/tanh/logistic)
+  alpha = L2 regularization strength
+  lr    = Initial learning rate for Adam optimizer
+  seed  = Random seed for the model (controls reproducibility)
+
+[GEN 01] best=0.9737 avg=0.9442 hls=(41,) act=tanh alpha=0.000001 lr=0.014665 seed=4315 | diversity: unique_hls=24, unique_act=3
+[GEN 02] best=0.9737 avg=0.9665 hls=(41,) act=tanh alpha=0.000001 lr=0.014665 seed=4315 | diversity: unique_hls=22, unique_act=3
+[GEN 03] best=0.9789 avg=0.9655 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=18, unique_act=3
+[GEN 04] best=0.9789 avg=0.9484 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=17, unique_act=3
+[GEN 05] best=0.9789 avg=0.9635 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=20, unique_act=3
+[GEN 06] best=0.9789 avg=0.9660 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=21, unique_act=3
+[GEN 07] best=0.9789 avg=0.9510 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=22, unique_act=3
+[GEN 08] best=0.9789 avg=0.9679 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=21, unique_act=3
+[GEN 09] best=0.9789 avg=0.9664 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=22, unique_act=3
+[GEN 10] best=0.9789 avg=0.9658 hls=(41,) act=logistic alpha=0.007499 lr=0.004539 seed=1169 | diversity: unique_hls=20, unique_act=3
+
+=== BEST CONFIGURATION (10-fold CV) ===
+hidden_layer_sizes: (41,)
+activation        : logistic
+alpha (L2)        : 0.007499
+learning_rate_init: 0.004539
+seed              : 1169
+mean_accuracy     : 0.9789
+[DONE]

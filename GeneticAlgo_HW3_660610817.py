@@ -1,31 +1,33 @@
-#!/usr/bin/env python3
 """
-GeneticAlgo_HW3_660610817.py
+GeneticAlgo_HW3_660610817.py  (Terminal-only output)
 
 Genetic Algorithm (GA) to search Multilayer Perceptron (MLP) architectures
 and hyperparameters, evaluated via 10-fold stratified cross-validation (i.e., 10% per fold).
 
 - Expects 'wdbc.csv' in the same folder with headers:
-  id_number, diagnosis, feature_1 ... feature_30
-  where diagnosis is 'M' or 'B'.
-- GA genome encodes: number of hidden layers (1..3), nodes per layer,
-  activation ('relu' or 'tanh' or 'logistic'), alpha (L2), learning_rate_init.
-- Fitness = mean cross-validated accuracy (10 folds).
-- Best configuration is reported and saved.
+  id_number, diagnosis, feature_1 ... feature_30  (diagnosis ∈ {M,B})
+- Genome encodes:
+  * n_layers ∈ {1,2,3}
+  * n1,n2,n3 ∈ [4,128] nodes (n2 used if n_layers≥2, n3 if n_layers=3)
+  * activation ∈ {relu,tanh,logistic}
+  * alpha ∈ [1e-6, 1e-1] (log-uniform)
+  * lr_init ∈ [1e-4, 1e-1] (log-uniform)
+  * seed ∈ ℕ (random_state for MLP)
+- Fitness = mean accuracy (10-fold stratified CV).
+
+This version adds:
+  • Clear legend at top (no abbreviations in meaning)
+  • Friendlier numeric formatting for alpha/lr (e.g., 0.0983 instead of 9.83e-02)
+  • Stronger architecture/seed mutation to avoid same hls/seed every generation
+  • Lower elitism (1) + slightly higher crossover to encourage exploration
+  • Per-generation diversity stats (unique HLS patterns, unique activations)
 
 Run:
   python GeneticAlgo_HW3_660610817.py --generations 10 --population 24
-
-Notes:
-- This script uses scikit-learn, numpy, pandas. Install if missing:
-    pip install numpy pandas scikit-learn
-- Comments are in English as requested.
 """
 
 import argparse
 import json
-import math
-import os
 import random
 import sys
 from dataclasses import dataclass, asdict
@@ -48,17 +50,14 @@ def set_global_seed(seed: int = 42) -> None:
     np.random.seed(seed)
 
 def load_wdbc(csv_path: str) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Load WDBC dataset from csv_path.
-    - Returns X (n_samples, 30), y (n_samples,) with y in {0,1} where 1=malignant (M), 0=benign (B).
-    """
     df = pd.read_csv(csv_path)
     expected_first_cols = ["id_number", "diagnosis"]
     if list(df.columns[:2]) != expected_first_cols:
-        print(f"[WARN] First two columns are {list(df.columns[:2])}, expected {expected_first_cols}. Proceeding anyway.", file=sys.stderr)
-    # Map labels
+        print(
+            f"[WARN] First two columns are {list(df.columns[:2])}, expected {expected_first_cols}. Proceeding anyway.",
+            file=sys.stderr
+        )
     y = df["diagnosis"].map({"M": 1, "B": 0}).values
-    # Use all feature_1..feature_30 columns
     feature_cols = [c for c in df.columns if c.startswith("feature_")]
     X = df[feature_cols].values.astype(np.float64)
     return X, y
@@ -71,16 +70,13 @@ ACTIVATIONS = ["relu", "tanh", "logistic"]
 
 @dataclass
 class Genome:
-    # Architecture
-    n_layers: int              # 1..3
-    n1: int                    # 4..64
-    n2: int                    # 4..64 (used if n_layers>=2 else ignored)
-    n3: int                    # 4..64 (used if n_layers==3 else ignored)
-    activation: str            # 'relu' | 'tanh' | 'logistic'
-    # Optimization hyperparams
-    alpha: float               # L2 regularization (1e-6..1e-1)
-    lr_init: float             # learning_rate_init (1e-4..1e-1)
-    # Random state (for reproducibility across folds)
+    n_layers: int
+    n1: int
+    n2: int
+    n3: int
+    activation: str
+    alpha: float
+    lr_init: float
     seed: int
 
     def hidden_layer_sizes(self) -> Tuple[int, ...]:
@@ -94,38 +90,41 @@ class Genome:
 def random_genome() -> Genome:
     return Genome(
         n_layers=random.randint(1, 3),
-        n1=random.randint(4, 64),
-        n2=random.randint(4, 64),
-        n3=random.randint(4, 64),
+        n1=random.randint(4, 128),
+        n2=random.randint(4, 128),
+        n3=random.randint(4, 128),
         activation=random.choice(ACTIVATIONS),
-        alpha=10 ** random.uniform(-6, -1),       # log-uniform
-        lr_init=10 ** random.uniform(-4, -1),     # log-uniform
+        alpha=10 ** random.uniform(-6, -1),
+        lr_init=10 ** random.uniform(-4, -1),
         seed=random.randint(0, 10_000)
     )
 
-def mutate(g: Genome, pm: float = 0.25) -> Genome:
-    """ Simple mutation operator. Each field mutates with probability pm. """
-    g = Genome(**asdict(g))  # copy
-    if random.random() < pm:
+def mutate(g: Genome) -> Genome:
+    """เพิ่มโอกาสกลายพันธุ์ของสถาปัตยกรรมและ seed เพื่อให้หลากหลายมากขึ้น"""
+    g = Genome(**asdict(g))
+    pm_struct = 0.5
+    pm_hyper = 0.35
+    pm_act = 0.3
+
+    if random.random() < pm_struct:
         g.n_layers = random.randint(1, 3)
-    if random.random() < pm:
-        g.n1 = int(np.clip(int(round(np.random.normal(g.n1, 8))), 4, 128))
-    if random.random() < pm:
-        g.n2 = int(np.clip(int(round(np.random.normal(g.n2, 8))), 4, 128))
-    if random.random() < pm:
-        g.n3 = int(np.clip(int(round(np.random.normal(g.n3, 8))), 4, 128))
-    if random.random() < pm:
+    if random.random() < pm_struct:
+        g.n1 = int(np.clip(int(round(np.random.normal(g.n1, 10))), 4, 128))
+    if random.random() < pm_struct:
+        g.n2 = int(np.clip(int(round(np.random.normal(g.n2, 10))), 4, 128))
+    if random.random() < pm_struct:
+        g.n3 = int(np.clip(int(round(np.random.normal(g.n3, 10))), 4, 128))
+    if random.random() < pm_act:
         g.activation = random.choice(ACTIVATIONS)
-    if random.random() < pm:
-        g.alpha = float(np.clip(g.alpha * (10 ** np.random.uniform(-0.5, 0.5)), 1e-7, 1e-0))
-    if random.random() < pm:
-        g.lr_init = float(np.clip(g.lr_init * (10 ** np.random.uniform(-0.5, 0.5)), 1e-5, 1e-0))
-    if random.random() < pm:
+    if random.random() < pm_hyper:
+        g.alpha = float(np.clip(g.alpha * (10 ** np.random.uniform(-0.7, 0.7)), 1e-7, 1e-0))
+    if random.random() < pm_hyper:
+        g.lr_init = float(np.clip(g.lr_init * (10 ** np.random.uniform(-0.7, 0.7)), 1e-5, 1e-0))
+    if random.random() < pm_struct:
         g.seed = random.randint(0, 10_000)
     return g
 
 def crossover(a: Genome, b: Genome) -> Tuple[Genome, Genome]:
-    """ One-point crossover across the tuple of fields. """
     fa = list(asdict(a).values())
     fb = list(asdict(b).values())
     point = random.randint(1, len(fa) - 1)
@@ -141,18 +140,11 @@ def crossover(a: Genome, b: Genome) -> Tuple[Genome, Genome]:
 # -----------------------------
 
 def evaluate_genome(g: Genome, X: np.ndarray, y: np.ndarray, verbose: bool = False) -> float:
-    """
-    Build an MLP with this genome and return mean accuracy over 10-fold stratified CV.
-    Uses a StandardScaler inside the pipeline to avoid data leakage.
-    Uses early_stopping to reduce overfitting; max_iter is moderate to keep runtime reasonable.
-    """
-    kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=123)  # 10% per fold
+    kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=123)
     scores = []
-
     for train_idx, test_idx in kfold.split(X, y):
         X_tr, X_te = X[train_idx], X[test_idx]
         y_tr, y_te = y[train_idx], y[test_idx]
-
         clf = make_pipeline(
             StandardScaler(),
             MLPClassifier(
@@ -169,175 +161,105 @@ def evaluate_genome(g: Genome, X: np.ndarray, y: np.ndarray, verbose: bool = Fal
         )
         clf.fit(X_tr, y_tr)
         y_pr = clf.predict(X_te)
-        acc = accuracy_score(y_te, y_pr)
-        scores.append(acc)
-
-    mean_acc = float(np.mean(scores))
-    if verbose:
-        print(f"[EVAL] {g.hidden_layer_sizes()} act={g.activation} alpha={g.alpha:.2e} lr={g.lr_init:.2e} -> {mean_acc:.4f}")
-    return mean_acc
+        scores.append(accuracy_score(y_te, y_pr))
+    return float(np.mean(scores))
 
 # -----------------------------
-# GA Loop
+# Helper display
+# -----------------------------
+
+def print_legend_once():
+    print(
+        "\nLegend for per-generation output:\n"
+        "  GEN   = Generation index\n"
+        "  best  = Best mean accuracy from 10-fold cross validation\n"
+        "  avg   = Average mean accuracy of all individuals in the generation\n"
+        "  hls   = Hidden layer sizes (tuple of nodes per hidden layer)\n"
+        "  act   = Activation function (relu/tanh/logistic)\n"
+        "  alpha = L2 regularization strength\n"
+        "  lr    = Initial learning rate for Adam optimizer\n"
+        "  seed  = Random seed for the model (controls reproducibility)\n"
+    )
+
+def fmt_float(x: float) -> str:
+    return f"{x:.6f}".rstrip('0').rstrip('.') if x < 1 else f"{x:.4f}"
+
+# -----------------------------
+# GA main loop
 # -----------------------------
 
 def tournament_select(pop: List[Tuple[Genome, float]], k: int = 3) -> Genome:
-    """ Tournament selection: pick k random individuals and return the best. """
     contenders = random.sample(pop, k)
-    winner = max(contenders, key=lambda t: t[1])
-    return winner[0]
+    return max(contenders, key=lambda t: t[1])[0]
 
-def run_ga(
-    X: np.ndarray,
-    y: np.ndarray,
-    generations: int = 10,
-    population_size: int = 24,
-    crossover_rate: float = 0.8,
-    mutation_rate: float = 0.25,
-    elitism: int = 2,
-    seed: int = 42,
-    verbose: bool = True,
-):
+def run_ga(X, y, generations=10, population_size=24, crossover_rate=0.9, elitism=1, seed=42, verbose=True):
     set_global_seed(seed)
-    # Initialize population
     population = [random_genome() for _ in range(population_size)]
+    best_tuple = None
     fitness_cache = {}
 
-    def fitness(g: Genome) -> float:
+    def fitness(g):
         key = json.dumps(asdict(g), sort_keys=True)
         if key not in fitness_cache:
-            fitness_cache[key] = evaluate_genome(g, X, y, verbose=False)
+            fitness_cache[key] = evaluate_genome(g, X, y)
         return fitness_cache[key]
 
-    history = []
-    best_tuple = None
+    if verbose:
+        print_legend_once()
 
     for gen in range(1, generations + 1):
-        # Evaluate population
         scored = [(g, fitness(g)) for g in population]
         scored.sort(key=lambda t: t[1], reverse=True)
-
         best_g, best_f = scored[0]
-        avg_f = float(np.mean([f for _, f in scored]))
-        history.append({"generation": gen, "best_fitness": best_f, "avg_fitness": avg_f, "best_genome": asdict(best_g)})
-        if verbose:
-            hls = best_g.hidden_layer_sizes()
-            print(f"[GEN {gen:02d}] best={best_f:.4f} avg={avg_f:.4f} "
-                  f"hls={hls} act={best_g.activation} alpha={best_g.alpha:.2e} lr={best_g.lr_init:.2e} seed={best_g.seed}")
+        avg_f = np.mean([f for _, f in scored])
+        unique_hls = len(set(tuple(g.hidden_layer_sizes()) for g, _ in scored))
+        unique_act = len(set(g.activation for g, _ in scored))
+
+        print(
+            f"[GEN {gen:02d}] best={best_f:.4f} avg={avg_f:.4f} "
+            f"hls={best_g.hidden_layer_sizes()} act={best_g.activation} "
+            f"alpha={fmt_float(best_g.alpha)} lr={fmt_float(best_g.lr_init)} seed={best_g.seed} "
+            f"| diversity: unique_hls={unique_hls}, unique_act={unique_act}"
+        )
 
         if best_tuple is None or best_f > best_tuple[1]:
             best_tuple = (best_g, best_f)
 
-        # Elitism: carry top 'elitism' genomes
         new_pop = [g for g, _ in scored[:elitism]]
-
-        # Generate rest via crossover + mutation using tournament selection
         while len(new_pop) < population_size:
-            parent1 = tournament_select(scored, k=3)
-            parent2 = tournament_select(scored, k=3)
+            p1, p2 = tournament_select(scored), tournament_select(scored)
             if random.random() < crossover_rate:
-                child1, child2 = crossover(parent1, parent2)
+                c1, c2 = crossover(p1, p2)
             else:
-                child1, child2 = parent1, parent2
-            child1 = mutate(child1, pm=mutation_rate)
-            child2 = mutate(child2, pm=mutation_rate)
-            new_pop.extend([child1, child2])
-
+                c1, c2 = p1, p2
+            new_pop.extend([mutate(c1), mutate(c2)])
         population = new_pop[:population_size]
 
-    return best_tuple, history
+    return best_tuple
 
 # -----------------------------
-# Main
+# Entry point
 # -----------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="GA to search MLP architectures with 10-fold CV on WDBC.")
-    parser.add_argument("--csv", type=str, default="wdbc.csv", help="Path to wdbc.csv (same folder by default).")
-    parser.add_argument("--generations", type=int, default=10, help="Number of GA generations.")
-    parser.add_argument("--population", type=int, default=24, help="Population size.")
-    parser.add_argument("--seed", type=int, default=42, help="Global random seed.")
-    parser.add_argument("--no-verbose", action="store_true", help="Reduce console output.")
+    parser = argparse.ArgumentParser(description="Genetic Algorithm MLP Search with 10-fold CV")
+    parser.add_argument("--csv", type=str, default="wdbc.csv")
+    parser.add_argument("--generations", type=int, default=10)
+    parser.add_argument("--population", type=int, default=24)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    csv_path = args.csv
-    if not os.path.exists(csv_path):
-        print(f"[ERROR] Cannot find '{csv_path}'. Place it in the same folder or pass --csv PATH.", file=sys.stderr)
-        sys.exit(1)
-
     set_global_seed(args.seed)
-    X, y = load_wdbc(csv_path)
+    X, y = load_wdbc(args.csv)
+    best_g, best_f = run_ga(X, y, generations=args.generations, population_size=args.population, seed=args.seed)
 
-    # Run GA
-    best, history = run_ga(
-        X, y,
-        generations=args.generations,
-        population_size=args.population,
-        crossover_rate=0.8,
-        mutation_rate=0.25,
-        elitism=2,
-        seed=args.seed,
-        verbose=(not args.no_verbose),
-    )
-
-    best_g, best_f = best
     print("\n=== BEST CONFIGURATION (10-fold CV) ===")
     print(f"hidden_layer_sizes: {best_g.hidden_layer_sizes()}")
     print(f"activation        : {best_g.activation}")
-    print(f"alpha (L2)        : {best_g.alpha:.3e}")
-    print(f"learning_rate_init: {best_g.lr_init:.3e}")
+    print(f"alpha (L2)        : {fmt_float(best_g.alpha)}")
+    print(f"learning_rate_init: {fmt_float(best_g.lr_init)}")
     print(f"seed              : {best_g.seed}")
     print(f"mean_accuracy     : {best_f:.4f}")
-
-    # Save artifacts
-    out_dir = "ga_results"
-    os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "best_config.json"), "w") as f:
-        json.dump({"best_fitness": best_f, "genome": asdict(best_g)}, f, indent=2)
-
-    hist_path = os.path.join(out_dir, "history.jsonl")
-    with open(hist_path, "w") as f:
-        for row in history:
-            f.write(json.dumps(row) + "\n")
-
-    # Optional: train best config on full dataset and save the scaler+model for reuse
-    # (Not used for scoring; this is just a convenience artifact.)
-    pipeline = make_pipeline(
-        StandardScaler(),
-        MLPClassifier(
-            hidden_layer_sizes=best_g.hidden_layer_sizes(),
-            activation=best_g.activation,
-            solver="adam",
-            alpha=best_g.alpha,
-            learning_rate_init=best_g.lr_init,
-            max_iter=500,
-            early_stopping=True,
-            n_iter_no_change=20,
-            random_state=best_g.seed,
-        )
-    )
-    pipeline.fit(X, y)
-    # Persist via joblib
-    try:
-        import joblib
-        joblib.dump(pipeline, os.path.join(out_dir, "final_model.joblib"))
-        print(f"[INFO] Saved trained pipeline to {os.path.join(out_dir, 'final_model.joblib')}")
-    except Exception as e:
-        print(f"[WARN] joblib not available or failed to save model: {e}")
-
-    # Also save a short CSV summary for quick reading
-    pd.DataFrame([
-        {
-            "hidden_layer_sizes": best_g.hidden_layer_sizes(),
-            "activation": best_g.activation,
-            "alpha": best_g.alpha,
-            "learning_rate_init": best_g.lr_init,
-            "seed": best_g.seed,
-            "cv_mean_accuracy": best_f
-        }
-    ]).to_csv(os.path.join(out_dir, "best_summary.csv"), index=False)
-
-    print(f"[INFO] GA history written to {hist_path}")
     print("[DONE]")
 
 if __name__ == "__main__":
